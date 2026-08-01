@@ -1,0 +1,14 @@
+{
+  "name": "آيات الأحكام من سورة البقرة — قراءة بيانية وفقهية",
+  "short_name": "آيات الأحكام",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f2e5",
+  "theme_color": "#14263f",
+  "icons": [
+    { "src": "img/thumb1.webp", "sizes": "640x360", "type": "image/webp", "purpose": "any" }
+  ]
+}

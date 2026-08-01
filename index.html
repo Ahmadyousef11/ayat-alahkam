@@ -11,6 +11,8 @@
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14263f">
 <link rel="stylesheet" href="assets/css/style.css">
 <script>(()=>{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;
 else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.dataset.theme='dark';})();</script>
@@ -45,6 +47,23 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
 </section>
 
 <main class="wrap">
+
+  <!-- البحث الشامل -->
+  <section class="find" id="find">
+    <div class="find-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" id="q" autocomplete="off" enterkeyhint="search"
+             placeholder="ابحث في المجالس التسعة… اكتب عبارة كاملة"
+             aria-label="بحث في كل تفريغات الدورة">
+      <button class="find-clear" id="qClear" hidden aria-label="مسح البحث">✕</button>
+    </div>
+    <p class="find-hint">يبحث في ٩٬٠٤٧ مقطعًا من التفريغ، ويتجاهل الهمزات والتشكيل تلقائيًّا.</p>
+    <div class="find-out" id="qOut" hidden></div>
+  </section>
+
+  <!-- متابعة الاستماع -->
+  <section class="resume" id="resume" hidden></section>
+
   <div class="section-head">
     <h2>مجالس الدورة</h2>
     <p>اختر المجلس للاستماع ومتابعة العرض التقديمي متزامنًا</p>
@@ -60,7 +79,12 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
 </footer>
 
 <script src="data/course.js"></script>
+<script src="data/topics.js"></script>
+<script src="assets/js/arabic.js"></script>
+<script src="assets/js/store.js"></script>
 <script src="assets/js/theme.js"></script>
 <script src="assets/js/home.js"></script>
+<script>if('serviceWorker' in navigator && location.protocol==='https:')
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>

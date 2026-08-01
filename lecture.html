@@ -6,6 +6,8 @@
 <title>المجلس — آيات الأحكام من سورة البقرة</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14263f">
 <link rel="stylesheet" href="assets/css/style.css">
 <script>(()=>{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;
 else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.dataset.theme='dark';})();</script>
@@ -51,6 +53,18 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
         <button class="navbtn next" id="nextBtn" aria-label="الشريحة التالية">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
         </button>
+        <button class="expand-btn" id="expandBtn" title="ملء الشاشة (F)" aria-label="عرض الشريحة ملء الشاشة">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+        </button>
+      </div>
+
+      <!-- الموضع الحالي -->
+      <div class="nowbar" id="nowbar" hidden>
+        <span class="nowbar-topic" id="nowTopic"></span>
+        <div class="nowbar-acts">
+          <button class="chip" id="markBtn" title="ضع علامة عند هذه اللحظة (M)">🔖 علامة</button>
+          <button class="chip" id="linkBtn" title="نسخ رابط هذه اللحظة">🔗 رابط اللحظة</button>
+        </div>
       </div>
 
       <!-- التفريغ المتزامن -->
@@ -64,6 +78,11 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
             التفريغ الكامل <small id="txCount"></small>
             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
+          <span class="auto-badge" title="التفريغ مستخرَج آليًّا من التسجيل، وقد يقع فيه خطأ في رسم الكلمة أو ضبطها. المُعوَّل عليه هو الصوت.">تفريغ آليّ</span>
+          <div class="tx-size" role="group" aria-label="حجم خطّ التفريغ">
+            <button class="tx-nav" id="fontDown" title="تصغير الخط" aria-label="تصغير خط التفريغ">أ−</button>
+            <button class="tx-nav" id="fontUp" title="تكبير الخط" aria-label="تكبير خط التفريغ">أ+</button>
+          </div>
           <div class="tx-find">
             <input type="search" id="txSearch" placeholder="ابحث في التفريغ… (جملة كاملة)" aria-label="بحث في التفريغ" autocomplete="off">
             <span class="tx-hits" id="txHits" hidden></span>
@@ -102,6 +121,7 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
             <button class="chip" id="back15" title="١٥ ثانية للخلف">↺ ١٥</button>
             <button class="chip" id="fwd15" title="١٥ ثانية للأمام">↻ ١٥</button>
             <button class="chip on" id="subsBtn" title="إظهار/إخفاء التفريغ المتزامن">💬 النص</button>
+            <button class="chip on" id="wordBtn" title="تظليل الكلمة المنطوقة (تقريبي)">✨ الكلمة</button>
             <div class="vol">
               <button class="icon-btn" id="muteBtn" style="width:36px;height:36px" aria-label="كتم الصوت"></button>
               <input type="range" id="vol" min="0" max="1" step="0.02" value="1" aria-label="مستوى الصوت">
@@ -123,13 +143,41 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
       </div>
     </div>
 
-    <!-- مصغّرات الشرائح -->
+    <!-- اللوح الجانبي: المواضيع والشرائح والعلامات -->
     <aside class="side">
-      <h4>الشرائح <small id="slideCount"></small></h4>
-      <div class="thumbs" id="thumbs"></div>
+      <div class="tabs" role="tablist">
+        <button class="tab on" id="tabTopics" role="tab" aria-selected="true">المواضيع <small id="topicCount"></small></button>
+        <button class="tab" id="tabSlides" role="tab" aria-selected="false">الشرائح <small id="slideCount"></small></button>
+        <button class="tab" id="tabMarks" role="tab" aria-selected="false">علاماتي <small id="markCount"></small></button>
+      </div>
+      <div class="topics" id="topics" role="tabpanel"></div>
+      <div class="thumbs" id="thumbs" role="tabpanel" hidden></div>
+      <div class="marks" id="marks" role="tabpanel" hidden></div>
     </aside>
   </div>
 </main>
+
+<!-- عارض الشريحة ملء الشاشة -->
+<div class="lightbox" id="lightbox" hidden>
+  <button class="lb-close" id="lbClose" aria-label="إغلاق">✕</button>
+  <button class="lb-nav lb-prev" id="lbPrev" aria-label="السابقة">›</button>
+  <img id="lbImg" alt="شريحة العرض">
+  <button class="lb-nav lb-next" id="lbNext" aria-label="التالية">‹</button>
+  <span class="lb-count" id="lbCount"></span>
+</div>
+
+<!-- مشغّل مصغّر للجوال -->
+<div class="mini" id="mini" hidden>
+  <button class="mini-play" id="miniPlay" aria-label="تشغيل/إيقاف"></button>
+  <div class="mini-mid">
+    <span class="mini-title" id="miniTitle"></span>
+    <div class="mini-bar"><i id="miniFill"></i></div>
+  </div>
+  <span class="mini-time" id="miniTime">٠:٠٠</span>
+</div>
+
+<!-- إشعار خفيف -->
+<div class="toast" id="toast" hidden></div>
 
 <footer class="site-footer">
   <div class="wrap"><p>آيات الأحكام من سورة البقرة · فضيلة د. مصطفى حسنين</p></div>
@@ -137,7 +185,12 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
 
 <script src="data/course.js"></script>
 <script src="data/timings.js"></script>
+<script src="data/topics.js"></script>
+<script src="assets/js/arabic.js"></script>
+<script src="assets/js/store.js"></script>
 <script src="assets/js/theme.js"></script>
 <script src="assets/js/lecture.js"></script>
+<script>if('serviceWorker' in navigator && location.protocol==='https:')
+  addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>

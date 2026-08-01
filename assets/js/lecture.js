@@ -1,8 +1,10 @@
 /* ===== صفحة المجلس: مشغّل + مزامنة الشرائح + الترجمة ===== */
 (() => {
-  const AR = s => String(s).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const { AR, norm, normMap } = window.Arabic;
   const $ = id => document.getElementById(id);
-  const id = Math.max(1, parseInt(new URLSearchParams(location.search).get('id') || '1', 10));
+  const QS = new URLSearchParams(location.search);
+  const id = Math.max(1, parseInt(QS.get('id') || '1', 10));
+  const startAt = Math.max(0, parseFloat(QS.get('t') || '0') || 0);
 
   const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.5-6.8a1 1 0 0 0 0-1.7L9.6 4.3A1 1 0 0 0 8 5.2Z"/></svg>';
   const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="4.5" width="4" height="15" rx="1.3"/><rect x="13.5" y="4.5" width="4" height="15" rx="1.3"/></svg>';
@@ -18,7 +20,8 @@
   };
 
   const audio = $('audio');
-  let L = null, slides = [], cues = [], timings = [], idx = 0, userLocked = false, lockTimer = null;
+  let L = null, slides = [], cues = [], timings = [], topics = [],
+      idx = 0, userLocked = false, topicCur = -1;
 
   /* ---------- التحميل ---------- */
   const getCourse = () => window.COURSE
@@ -61,6 +64,13 @@
     if (timings.length) $('slideBox').classList.add('synced');
     else if (L.audio) note('مزامنة الشرائح لهذا المجلس لم تُضبط بعد؛ يمكنك التقليب بين الشرائح يدويًّا.');
 
+    topics = (window.TOPICS && window.TOPICS[L.id])
+             || await loadJSON(`data/topics/lec${L.id}.json`) || [];
+    buildTopics();
+    buildMarks();
+    if (L.audio) $('nowbar').hidden = false;
+    $('miniTitle').textContent = `المجلس ${AR(L.id)}`;
+
     cues = await loadVTT(`subs/lec${L.id}.vtt`);
     if (cues.length) {
       $('subs').classList.remove('empty');
@@ -70,8 +80,19 @@
       $('subs').textContent = 'التفريغ المتزامن يحتاج تشغيل الموقع عبر خادم محلي (شغّل serve.bat).';
     }
 
-    if (L.audio) tryAutoplay();
+    if (L.audio) startPlayback();
   });
+
+  /* يبدأ من رابط اللحظة، أو من حيث توقّف القارئ سابقًا */
+  function startPlayback() {
+    const saved = window.Store && Store.get(L.id);
+    const at = startAt || (saved && saved.d && saved.t / saved.d < 0.97 ? saved.t : 0);
+    const seek = () => { if (at > 0) try { audio.currentTime = at; } catch (e) {} };
+    if (audio.readyState >= 1) seek();
+    else audio.addEventListener('loadedmetadata', seek, { once: true });
+    if (at > 0 && !startAt) toast(`تابعنا من حيث توقّفت — ${fmt(at)}`);
+    tryAutoplay();
+  }
 
   const loadJSON = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
 
@@ -104,10 +125,12 @@
 
   /* ---------- الشرائح ---------- */
   function buildThumbs() {
+    /* المصغّرة نسخة ٣٢٠ بكسل (~٩ ك.ب) لا الشريحة كاملة — أخفّ على الجوال */
     $('thumbs').innerHTML = slides.map((src, i) => `
       <button data-i="${i}" aria-label="الشريحة ${i + 1}">
         <i>${AR(i + 1)}</i>
-        <figure><img src="${src}" loading="lazy" alt=""><b class="tm" data-i="${i}"></b></figure>
+        <figure><img src="${src.replace(/\/(\d+\.webp)$/, '/t/$1')}" loading="lazy"
+                     width="320" height="180" alt=""><b class="tm" data-i="${i}"></b></figure>
       </button>`).join('');
     $('thumbs').querySelectorAll('button').forEach(b =>
       b.addEventListener('click', () => {
@@ -147,6 +170,115 @@
     if (slides[i + 1]) { const im = new Image(); im.src = slides[i + 1]; }
   }
 
+  /* ---------- فهرس المواضيع ---------- */
+  function buildTopics() {
+    const box = $('topics');
+    if (!topics.length) {
+      box.innerHTML = '<p class="side-empty">فهرس المواضيع غير متوفّر لهذا المجلس.</p>';
+      $('topicCount').textContent = '';
+      return;
+    }
+    $('topicCount').textContent = `(${AR(topics.length)})`;
+    box.innerHTML = topics.map((tp, i) => `
+      <button class="topic" data-i="${i}" data-t="${tp.t}">
+        <time>${fmt(tp.t)}</time>
+        <span><b>${esc(tp.title)}</b>${tp.sub ? `<em>${esc(tp.sub)}</em>` : ''}</span>
+      </button>`).join('');
+    box.addEventListener('click', e => {
+      const b = e.target.closest('.topic'); if (!b) return;
+      goTo(+b.dataset.t);
+    });
+  }
+
+  function topicAt(t) {
+    let lo = 0, hi = topics.length - 1, res = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (topics[mid].t <= t) { res = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    return res;
+  }
+
+  function paintTopic(t) {
+    const k = topicAt(t);
+    if (k === topicCur) return;
+    topicCur = k;
+    $('topics').querySelectorAll('.topic').forEach((b, i) => b.classList.toggle('cur', i === k));
+    $('nowTopic').textContent = k >= 0 ? topics[k].title : '';
+    const act = $('topics').querySelector('.topic.cur');
+    if (act && $('topics').offsetParent) {
+      const box = $('topics'), top = act.offsetTop - box.offsetTop;
+      if (top < box.scrollTop || top + act.offsetHeight > box.scrollTop + box.clientHeight)
+        box.scrollTop = top - box.clientHeight / 2 + act.offsetHeight / 2;
+    }
+  }
+
+  /* ---------- العلامات المرجعية ---------- */
+  function buildMarks() {
+    const list = window.Store ? Store.marks(L.id) : [];
+    $('markCount').textContent = list.length ? `(${AR(list.length)})` : '';
+    const box = $('marks');
+    if (!list.length) {
+      box.innerHTML = '<p class="side-empty">لا علامات بعد.<br>اضغط <b>🔖 علامة</b> أثناء الاستماع لتحفظ الموضع، أو مفتاح <b>M</b>.</p>';
+      return;
+    }
+    box.innerHTML = list.map(m => `
+      <div class="mark">
+        <button class="mark-go" data-t="${m.t}"><time>${fmt(m.t)}</time>
+          <span>${esc(m.n || (topics[topicAt(m.t)] || {}).title || 'علامة')}</span></button>
+        <button class="mark-del" data-t="${m.t}" title="حذف العلامة" aria-label="حذف العلامة">✕</button>
+      </div>`).join('');
+  }
+
+  $('marks').addEventListener('click', e => {
+    const go = e.target.closest('.mark-go');
+    if (go) { goTo(+go.dataset.t); return; }
+    const del = e.target.closest('.mark-del');
+    if (del) { Store.delMark(L.id, +del.dataset.t); buildMarks(); toast('حُذفت العلامة'); }
+  });
+
+  function addMark() {
+    if (!window.Store || !L) return;
+    const t = Math.floor(audio.currentTime);
+    Store.addMark(L.id, t, (topics[topicAt(t)] || {}).title || '');
+    buildMarks();
+    switchTab('marks');
+    toast(`وُضعت علامة عند ${fmt(t)}`);
+  }
+
+  /* ---------- التبويبات ---------- */
+  function switchTab(which) {
+    const map = { topics: ['tabTopics', 'topics'], slides: ['tabSlides', 'thumbs'], marks: ['tabMarks', 'marks'] };
+    for (const k in map) {
+      const on = k === which;
+      $(map[k][0]).classList.toggle('on', on);
+      $(map[k][0]).setAttribute('aria-selected', String(on));
+      $(map[k][1]).hidden = !on;
+    }
+  }
+  $('tabTopics').addEventListener('click', () => switchTab('topics'));
+  $('tabSlides').addEventListener('click', () => switchTab('slides'));
+  $('tabMarks').addEventListener('click', () => switchTab('marks'));
+
+  /* ---------- الانتقال إلى لحظة ---------- */
+  function goTo(t) {
+    if (!audio.src && !audio.querySelector('source')) return;
+    audio.currentTime = t;
+    if (audio.paused) audio.play().catch(() => {});
+    if (userLocked) unlockUser();
+  }
+
+  /* ---------- إشعار خفيف ---------- */
+  let toastTimer;
+  function toast(msg) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.hidden = false;
+    el.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.classList.remove('on'); }, 2600);
+  }
+
   /* ---------- التفريغ الكامل ---------- */
   let txRows = [], txCur = -1, subsOn = true;
 
@@ -174,44 +306,15 @@
   });
 
   /* ---------- البحث في التفريغ ----------
-     تطبيع عربي: تجاهل التشكيل والهمزات والتطويل، وتوحيد الألف المقصورة
-     والتاء المربوطة، وضغط المسافات — كي يجد «أصوّر» و«اصور» و«أَصور» سواء.
-     يُحافظ على خريطة موضعية بين النص المطبَّع والأصلي لتمييز المطابقة بدقّة. */
-  const AR_DIAC = /[ً-ْٰـۖ-ۭ]/;   /* تشكيل + تطويل */
-
-  function normMap(s) {
-    let out = '', map = [];
-    for (let i = 0; i < s.length; i++) {
-      let c = s[i];
-      if (AR_DIAC.test(c)) continue;                 /* يُحذف من المطابقة */
-      if ('أإآٱٲٳا'.includes(c)) c = 'ا';
-      else if (c === 'ى') c = 'ي';
-      else if (c === 'ة') c = 'ه';
-      else if (c === 'ؤ') c = 'و';
-      else if (c === 'ئ') c = 'ي';
-      else if (c === 'ء') continue;                  /* الهمزة المفردة تُتجاهل */
-      else c = c.toLowerCase();
-      if (c === ' ' && out.endsWith(' ')) continue;  /* ضغط المسافات */
-      out += c; map.push(i);
-    }
-    return { n: out, map };
-  }
-  const norm = s => normMap(s).n;
-
+     يستعمل التطبيع العربي المشترك في assets/js/arabic.js: يتجاهل التشكيل
+     والهمزات والتطويل — كي يجد «أصوّر» و«اصور» و«أَصور» سواء. */
   let txMatches = [], txHit = -1;
 
   function markRow(row, text, q) {
     const p = row.querySelector('p');
-    if (!q) { p.innerHTML = esc(text); return 0; }
-    const { n, map } = normMap(text), nq = norm(q);
-    let html = '', last = 0, at = 0, count = 0;
-    while (nq && (at = n.indexOf(nq, at)) !== -1) {
-      const s = map[at], e = (map[at + nq.length - 1] ?? s) + 1;
-      html += esc(text.slice(last, s)) + '<mark>' + esc(text.slice(s, e)) + '</mark>';
-      last = e; at += nq.length; count++;
-    }
-    p.innerHTML = html + esc(text.slice(last));
-    return count;
+    const r = window.Arabic.highlight(text, q || '');
+    p.innerHTML = r.html;
+    return r.count;
   }
 
   function gotoHit(k) {
@@ -320,9 +423,7 @@
         if (cues[mid].s <= t) { k = mid; lo = mid + 1; } else hi = mid - 1;
       }
       const c = (k >= 0 && t <= cues[k].e) ? cues[k] : null;
-      const box = $('subs');
-      const txt = c ? c.t : '';
-      if (box.textContent !== txt) box.textContent = txt;
+      paintSubs(c, t);
       if (k !== txCur) {
         if (txRows[txCur]) txRows[txCur].classList.remove('cur');
         txCur = k;
@@ -332,14 +433,90 @@
         }
       }
     }
+    if (topics.length) paintTopic(t);
     $('cur').textContent = fmt(t);
+    $('miniTime').textContent = fmt(t);
     const d = audio.duration || L?.duration || 0;
     if (d) {
       const p = (t / d) * 100;
       $('fill').style.width = p + '%';
       $('knob').style.insetInlineStart = p + '%';
+      $('miniFill').style.width = p + '%';
     }
+    saveProgress(t, d);
   });
+
+  /* ---------- حفظ التقدّم (مرة كل ٥ ثوانٍ) ---------- */
+  let lastSave = 0;
+  function saveProgress(t, d) {
+    if (!window.Store || !L || !d) return;
+    if (Math.abs(t - lastSave) < 5) return;
+    lastSave = t;
+    Store.save(L.id, t, d);
+  }
+  addEventListener('pagehide', () => {
+    if (window.Store && L && audio.duration) Store.save(L.id, audio.currentTime, audio.duration);
+  });
+
+  /* ---------- التفريغ المتزامن + تظليل الكلمة ----------
+     التوقيت على مستوى الجملة لا الكلمة، فنوزّع زمن الجملة على كلماتها
+     بحسب أطوالها. تتبّعٌ مرئيّ مُعين، لا مطابقة دقيقة. */
+  let wordOn = localStorage.getItem('wordHL') !== '0';
+  let subsCue = null, subsWords = [], subsW = -1;
+
+  function splitWords(text) {
+    const parts = text.split(/(\s+)/);
+    const words = [];
+    let n = 0;
+    parts.forEach(p => { if (p.trim()) n += p.trim().length; });
+    let acc = 0;
+    parts.forEach(p => {
+      if (!p.trim()) { words.push({ w: p, sep: true }); return; }
+      const share = p.trim().length / (n || 1);
+      words.push({ w: p, sep: false, a: acc, b: acc + share });
+      acc += share;
+    });
+    return words;
+  }
+
+  function paintSubs(c, t) {
+    const box = $('subs');
+    if (!c) {
+      if (subsCue !== null) { box.textContent = ''; subsCue = null; subsWords = []; subsW = -1; }
+      return;
+    }
+    if (c !== subsCue) {
+      subsCue = c; subsW = -1;
+      subsWords = splitWords(c.t);
+      if (wordOn) {
+        box.innerHTML = subsWords.map((o, i) =>
+          o.sep ? esc(o.w) : `<span class="w" data-i="${i}">${esc(o.w)}</span>`).join('');
+      } else {
+        box.textContent = c.t;
+      }
+    }
+    if (!wordOn) return;
+    const span = Math.max(0.4, (c.e - c.s));
+    const r = Math.min(1, Math.max(0, (t - c.s) / span));
+    let k = -1;
+    for (let i = 0; i < subsWords.length; i++) {
+      const o = subsWords[i];
+      if (!o.sep && r >= o.a && r < o.b) { k = i; break; }
+    }
+    if (k === subsW) return;
+    if (subsW >= 0) { const p = box.querySelector(`.w[data-i="${subsW}"]`); if (p) p.classList.remove('on'); }
+    subsW = k;
+    if (k >= 0) { const n = box.querySelector(`.w[data-i="${k}"]`); if (n) n.classList.add('on'); }
+  }
+
+  $('wordBtn').addEventListener('click', () => {
+    wordOn = !wordOn;
+    localStorage.setItem('wordHL', wordOn ? '1' : '0');
+    $('wordBtn').classList.toggle('on', wordOn);
+    subsCue = null;                       /* أعِد رسم المقطع الحالي */
+    toast(wordOn ? 'تظليل الكلمة مفعّل (تقريبي)' : 'أُطفئ تظليل الكلمة');
+  });
+  $('wordBtn').classList.toggle('on', wordOn);
 
   audio.addEventListener('loadedmetadata', () => { $('dur').textContent = fmt(audio.duration); });
   audio.addEventListener('progress', () => {
@@ -393,12 +570,83 @@
     else if (e.key === 'ArrowLeft') audio.currentTime += 5;
   });
 
-  /* اختصارات لوحة المفاتيح */
+  /* ---------- حجم خطّ التفريغ ---------- */
+  const SIZES = [15.5, 16.5, 18, 20, 22];
+  let sizeIx = Math.min(SIZES.length - 1,
+                        Math.max(0, parseInt(localStorage.getItem('txSize') || '1', 10)));
+  function applySize() {
+    document.documentElement.style.setProperty('--tx-size', SIZES[sizeIx] + 'px');
+    localStorage.setItem('txSize', String(sizeIx));
+    $('fontDown').disabled = sizeIx === 0;
+    $('fontUp').disabled = sizeIx === SIZES.length - 1;
+  }
+  $('fontUp').addEventListener('click', () => { sizeIx = Math.min(SIZES.length - 1, sizeIx + 1); applySize(); });
+  $('fontDown').addEventListener('click', () => { sizeIx = Math.max(0, sizeIx - 1); applySize(); });
+  applySize();
+
+  /* ---------- رابط اللحظة ---------- */
+  $('linkBtn').addEventListener('click', async () => {
+    const t = Math.floor(audio.currentTime);
+    const url = `${location.origin}${location.pathname}?id=${L.id}&t=${t}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast(`نُسخ رابط اللحظة ${fmt(t)}`);
+    } catch (e) {
+      prompt('انسخ الرابط:', url);
+    }
+  });
+  $('markBtn').addEventListener('click', addMark);
+
+  /* ---------- عرض الشريحة ملء الشاشة ---------- */
+  const lb = $('lightbox');
+  function openLB() {
+    lb.hidden = false;
+    document.body.style.overflow = 'hidden';
+    paintLB();
+  }
+  function closeLB() { lb.hidden = true; document.body.style.overflow = ''; }
+  function paintLB() {
+    $('lbImg').src = slides[idx];
+    $('lbCount').textContent = `${AR(idx + 1)} / ${AR(slides.length)}`;
+  }
+  $('expandBtn').addEventListener('click', openLB);
+  $('lbClose').addEventListener('click', closeLB);
+  lb.addEventListener('click', e => { if (e.target === lb) closeLB(); });
+  $('lbPrev').addEventListener('click', () => { show(idx - 1); lockUser(); paintLB(); });
+  $('lbNext').addEventListener('click', () => { show(idx + 1); lockUser(); paintLB(); });
+
+  /* ---------- المشغّل المصغّر (يظهر حين يغيب الأصلي) ---------- */
+  $('miniPlay').addEventListener('click', () => audio.paused ? audio.play() : audio.pause());
+  $('mini').addEventListener('click', e => {
+    if (e.target.closest('#miniPlay')) return;
+    $('player').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+  function paintMiniIcon() { $('miniPlay').innerHTML = audio.paused ? ICON_PLAY : ICON_PAUSE; }
+  audio.addEventListener('play', paintMiniIcon);
+  audio.addEventListener('pause', paintMiniIcon);
+  paintMiniIcon();
+
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver(([en]) => {
+      const show = !en.isIntersecting && L && L.audio && audio.currentTime > 0;
+      $('mini').hidden = !show;
+    }, { threshold: 0 }).observe($('player'));
+  }
+
+  /* ---------- اختصارات لوحة المفاتيح ---------- */
   document.addEventListener('keydown', e => {
     if (/input|textarea/i.test(e.target.tagName)) return;
+    if (!lb.hidden) {
+      if (e.key === 'Escape') { closeLB(); return; }
+      if (e.key === 'ArrowRight') { show(idx - 1); lockUser(); paintLB(); return; }
+      if (e.key === 'ArrowLeft') { show(idx + 1); lockUser(); paintLB(); return; }
+    }
     if (e.code === 'Space') { e.preventDefault(); audio.paused ? audio.play() : audio.pause(); }
     else if (e.key === 'ArrowRight') { show(idx - 1); lockUser(); }
     else if (e.key === 'ArrowLeft') { show(idx + 1); lockUser(); }
+    else if (e.key === 'm' || e.key === 'M' || e.key === 'م') addMark();
+    else if (e.key === 'f' || e.key === 'F' || e.key === 'ب') lb.hidden ? openLB() : closeLB();
+    else if (e.key === '/') { e.preventDefault(); $('txSearch').focus(); }
   });
 
   window.__paintThumbTimes = paintThumbTimes;
