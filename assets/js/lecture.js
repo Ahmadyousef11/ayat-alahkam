@@ -74,10 +74,10 @@
     cues = await loadVTT(`subs/lec${L.id}.vtt`);
     if (cues.length) {
       $('subs').classList.remove('empty');
-      $('subs').textContent = '';
+      $('subsLine').textContent = '';
       buildTranscript();
     } else if (location.protocol === 'file:') {
-      $('subs').textContent = 'التفريغ المتزامن يحتاج تشغيل الموقع عبر خادم محلي (شغّل serve.bat).';
+      $('subsLine').textContent = 'التفريغ المتزامن يحتاج تشغيل الموقع عبر خادم محلي (شغّل serve.bat).';
     }
 
     if (L.audio) startPlayback();
@@ -480,7 +480,9 @@
   }
 
   function paintSubs(c, t) {
-    const box = $('subs');
+    /* الكتابة داخل عنصر كتليّ لا في حاوية flex مباشرةً — وإلا صار كل
+       <span> عنصرَ flex مستقلًّا فلا يلتفّ النصّ ويتمدّد السطر أفقيًّا. */
+    const box = $('subsLine');
     if (!c) {
       if (subsCue !== null) { box.textContent = ''; subsCue = null; subsWords = []; subsW = -1; }
       return;

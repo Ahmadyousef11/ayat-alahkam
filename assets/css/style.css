@@ -53,7 +53,14 @@ html[data-theme="dark"] {
 /* الخاصية hidden يتجاوزها أي display صريح، فنُثبّتها هنا مرة واحدة */
 [hidden] { display: none !important; }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* كروم على أندرويد «ينفخ» خطّ الكتل الطويلة تلقائيًّا (Font Boosting)،
+     فيكبر مربع التفريغ فجأة حين يطول النص وتختلّ نسب الصفحة. هذا يوقفه. */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 body {
   margin: 0;
@@ -242,13 +249,22 @@ button { font-family: inherit; cursor: pointer; border: 0; background: none; col
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 
 /* الترجمة */
+/* مربع التفريغ المتزامن: طول المقطع يتراوح بين ١٠ و٤٠٠ حرف، فنُثبّت
+   ارتفاعه بحدٍّ أدنى وأقصى ونمرّر داخله — كي لا تقفز الصفحة تحته. */
 .subs {
-  min-height: 66px; margin-top: 12px; padding: 13px 18px;
+  min-height: 76px; max-height: 26vh; overflow-y: auto; overscroll-behavior: contain;
+  margin-top: 12px; padding: 13px 18px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
   font-size: 18.5px; line-height: 1.9; text-align: center; color: var(--text);
   display: flex; align-items: center; justify-content: center;
+  scroll-behavior: smooth;
 }
-.subs.empty { color: var(--text-soft); font-size: 15.5px; }
+.subs-line { display: block; width: 100%; overflow-wrap: anywhere; }
+.subs.empty { color: var(--text-soft); }
+.subs.empty .subs-line { font-size: 15.5px; }
+@media (max-width: 900px) {
+  .subs { font-size: 17px; line-height: 1.85; min-height: 88px; max-height: 34vh; padding: 12px 14px; }
+}
 
 /* المشغل */
 .player { margin-top: 14px; padding: 17px 19px; background: var(--surface);
@@ -663,3 +679,22 @@ html[data-theme="dark"] .auto-badge { color: #eaa79c; }
   .nowbar-topic { font-size: 15px; }
 }
 @media (min-width: 901px) { .mini { display: none !important; } }
+
+/* ===================================================================
+   منع التكبير المفاجئ على الهاتف
+   iOS يكبّر الصفحة تلقائيًّا حين تُلمَس خانةُ إدخال خطُّها دون ١٦ بكسل،
+   ثم لا يعيدها. الحلّ الصحيح: ألّا ينزل خطُّ أي حقل عن ١٦ بكسل على اللمس
+   (لا تعطيل التكبير، فذلك يضرّ ضعاف البصر).
+   =================================================================== */
+@media (hover: none) and (pointer: coarse) {
+  input, select, textarea,
+  .tx-head input[type=search],
+  .find-box input { font-size: 16px; }
+
+  /* أهداف لمس مريحة */
+  .tx-nav, .find-clear { width: 38px; height: 38px; }
+  .chip { padding: 8px 14px; }
+}
+@media (max-width: 900px) {
+  .tx-head input[type=search] { font-size: 16px; }
+}
