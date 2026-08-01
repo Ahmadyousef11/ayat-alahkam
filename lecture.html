@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>المجلس — آيات الأحكام من سورة البقرة</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="assets/css/style.css">
+<script>(()=>{const t=localStorage.getItem('theme');if(t)document.documentElement.dataset.theme=t;
+else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.dataset.theme='dark';})();</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="index.html">
+      <span class="mark">📖</span>
+      <span>آيات الأحكام<small>قراءة بيانية وفقهية</small></span>
+    </a>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="themeBtn" aria-label="تبديل الوضع الليلي"></button>
+  </div>
+</header>
+
+<section class="lec-head">
+  <div class="wrap">
+    <a class="back" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 18l6-6-6-6"/></svg>
+      كل المجالس
+    </a>
+    <h1 id="lecTitle">…</h1>
+    <p class="sub" id="lecSub"></p>
+  </div>
+</section>
+
+<main class="wrap">
+  <div id="notice"></div>
+
+  <div class="stage">
+    <div>
+      <!-- الشرائح -->
+      <div class="slide-box" id="slideBox">
+        <span class="slide-counter" id="counter">١ / ١</span>
+        <span class="live"><span class="dot"></span> مزامنة</span>
+        <button class="live manual-badge" id="resync" title="عودة إلى المزامنة مع الصوت">↻ عودة للمزامنة</button>
+        <img id="slideImg" alt="شريحة العرض" width="1600" height="900">
+        <button class="navbtn prev" id="prevBtn" aria-label="الشريحة السابقة">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 18l6-6-6-6"/></svg>
+        </button>
+        <button class="navbtn next" id="nextBtn" aria-label="الشريحة التالية">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 6l-6 6 6 6"/></svg>
+        </button>
+      </div>
+
+      <!-- التفريغ المتزامن -->
+      <div class="subs empty" id="subs">التفريغ المتزامن غير متوفر لهذا المجلس بعد.</div>
+
+      <!-- التفريغ الكامل -->
+      <section class="tx" id="tx" hidden>
+        <div class="tx-head">
+          <button class="tx-toggle" id="txToggle" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+            التفريغ الكامل <small id="txCount"></small>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <input type="search" id="txSearch" placeholder="ابحث في التفريغ…" aria-label="بحث في التفريغ">
+        </div>
+        <div class="tx-body" id="txBody" hidden></div>
+      </section>
+
+      <!-- المشغل -->
+      <div class="player" id="player">
+        <div class="row">
+          <button class="play-btn" id="playBtn" aria-label="تشغيل"></button>
+          <div class="seek">
+            <span class="time" id="cur">٠:٠٠</span>
+            <div class="bar" id="bar" role="slider" aria-label="موضع التشغيل" tabindex="0">
+              <div class="buf" id="buf"></div>
+              <div class="fill" id="fill"></div>
+              <div class="knob" id="knob"></div>
+            </div>
+            <span class="time" id="dur">٠:٠٠</span>
+          </div>
+        </div>
+
+        <div class="row" style="justify-content:space-between">
+          <div class="ctrl-group" id="speeds">
+            <span style="font-size:14.5px;color:var(--text-soft)">السرعة</span>
+            <button class="chip" data-rate="0.75">٠.٧٥×</button>
+            <button class="chip on" data-rate="1">١×</button>
+            <button class="chip" data-rate="1.25">١.٢٥×</button>
+            <button class="chip" data-rate="1.5">١.٥×</button>
+            <button class="chip" data-rate="2">٢×</button>
+          </div>
+          <div class="ctrl-group">
+            <button class="chip" id="back15" title="١٥ ثانية للخلف">↺ ١٥</button>
+            <button class="chip" id="fwd15" title="١٥ ثانية للأمام">↻ ١٥</button>
+            <button class="chip on" id="subsBtn" title="إظهار/إخفاء التفريغ المتزامن">💬 النص</button>
+            <div class="vol">
+              <button class="icon-btn" id="muteBtn" style="width:36px;height:36px" aria-label="كتم الصوت"></button>
+              <input type="range" id="vol" min="0" max="1" step="0.02" value="1" aria-label="مستوى الصوت">
+            </div>
+          </div>
+        </div>
+
+        <div class="dl-row">
+          <a class="dl" id="dlAudio" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 19h16"/></svg>
+            تحميل الصوت (MP3)
+          </a>
+          <a class="dl" id="dlPdf" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+            تحميل العرض (PDF)
+          </a>
+        </div>
+        <audio id="audio" preload="metadata"></audio>
+      </div>
+    </div>
+
+    <!-- مصغّرات الشرائح -->
+    <aside class="side">
+      <h4>الشرائح <small id="slideCount"></small></h4>
+      <div class="thumbs" id="thumbs"></div>
+    </aside>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap"><p>آيات الأحكام من سورة البقرة · فضيلة د. مصطفى حسنين</p></div>
+</footer>
+
+<script src="data/course.js"></script>
+<script src="data/timings.js"></script>
+<script src="assets/js/theme.js"></script>
+<script src="assets/js/lecture.js"></script>
+</body>
+</html>
