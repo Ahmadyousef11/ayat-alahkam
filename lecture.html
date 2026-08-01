@@ -64,7 +64,12 @@ else if(matchMedia('(prefers-color-scheme:dark)').matches)document.documentEleme
             التفريغ الكامل <small id="txCount"></small>
             <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <input type="search" id="txSearch" placeholder="ابحث في التفريغ…" aria-label="بحث في التفريغ">
+          <div class="tx-find">
+            <input type="search" id="txSearch" placeholder="ابحث في التفريغ… (جملة كاملة)" aria-label="بحث في التفريغ" autocomplete="off">
+            <span class="tx-hits" id="txHits" hidden></span>
+            <button class="tx-nav" id="txPrev" hidden title="النتيجة السابقة" aria-label="النتيجة السابقة">‹</button>
+            <button class="tx-nav" id="txNext" hidden title="النتيجة التالية (Enter)" aria-label="النتيجة التالية">›</button>
+          </div>
         </div>
         <div class="tx-body" id="txBody" hidden></div>
       </section>

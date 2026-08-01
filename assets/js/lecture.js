@@ -59,7 +59,7 @@
               || await loadJSON(`data/timings/lec${L.id}.json`) || [];
     paintThumbTimes();
     if (timings.length) $('slideBox').classList.add('synced');
-    else if (L.audio) note('مزامنة الشرائح لهذا المجلس لم تُضبط بعد. يمكنك ضبطها بسهولة من <a href="sync.html?id=' + L.id + '" style="color:var(--accent)">محرّر المزامنة</a>، أو التقليب يدويًّا.');
+    else if (L.audio) note('مزامنة الشرائح لهذا المجلس لم تُضبط بعد؛ يمكنك التقليب بين الشرائح يدويًّا.');
 
     cues = await loadVTT(`subs/lec${L.id}.vtt`);
     if (cues.length) {
@@ -155,6 +155,7 @@
   function buildTranscript() {
     $('tx').hidden = false;
     $('txCount').textContent = `(${AR(cues.length)} مقطعًا)`;
+    cues.forEach(c => { c._n = norm(c.t); });   /* نسخة مطبَّعة للبحث السريع */
     $('txBody').innerHTML = cues.map((c, i) =>
       `<button class="tx-line" data-i="${i}"><time>${fmt(c.s)}</time><p>${esc(c.t)}</p></button>`).join('');
     txRows = [...$('txBody').querySelectorAll('.tx-line')];
@@ -172,23 +173,97 @@
     if (open && txCur >= 0) scrollToCur();
   });
 
-  $('txSearch').addEventListener('input', e => {
-    const q = e.target.value.trim();
-    if ($('txBody').hidden) $('txToggle').click();
-    let hits = 0;
-    txRows.forEach((row, i) => {
-      const t = cues[i].t;
-      const hit = q && t.includes(q);
-      row.hidden = q ? !hit : false;
-      if (hit) hits++;
-      row.querySelector('p').innerHTML = (q && hit)
-        ? esc(t).split(esc(q)).join(`<mark>${esc(q)}</mark>`) : esc(t);
-    });
+  /* ---------- البحث في التفريغ ----------
+     تطبيع عربي: تجاهل التشكيل والهمزات والتطويل، وتوحيد الألف المقصورة
+     والتاء المربوطة، وضغط المسافات — كي يجد «أصوّر» و«اصور» و«أَصور» سواء.
+     يُحافظ على خريطة موضعية بين النص المطبَّع والأصلي لتمييز المطابقة بدقّة. */
+  const AR_DIAC = /[ً-ْٰـۖ-ۭ]/;   /* تشكيل + تطويل */
+
+  function normMap(s) {
+    let out = '', map = [];
+    for (let i = 0; i < s.length; i++) {
+      let c = s[i];
+      if (AR_DIAC.test(c)) continue;                 /* يُحذف من المطابقة */
+      if ('أإآٱٲٳا'.includes(c)) c = 'ا';
+      else if (c === 'ى') c = 'ي';
+      else if (c === 'ة') c = 'ه';
+      else if (c === 'ؤ') c = 'و';
+      else if (c === 'ئ') c = 'ي';
+      else if (c === 'ء') continue;                  /* الهمزة المفردة تُتجاهل */
+      else c = c.toLowerCase();
+      if (c === ' ' && out.endsWith(' ')) continue;  /* ضغط المسافات */
+      out += c; map.push(i);
+    }
+    return { n: out, map };
+  }
+  const norm = s => normMap(s).n;
+
+  let txMatches = [], txHit = -1;
+
+  function markRow(row, text, q) {
+    const p = row.querySelector('p');
+    if (!q) { p.innerHTML = esc(text); return 0; }
+    const { n, map } = normMap(text), nq = norm(q);
+    let html = '', last = 0, at = 0, count = 0;
+    while (nq && (at = n.indexOf(nq, at)) !== -1) {
+      const s = map[at], e = (map[at + nq.length - 1] ?? s) + 1;
+      html += esc(text.slice(last, s)) + '<mark>' + esc(text.slice(s, e)) + '</mark>';
+      last = e; at += nq.length; count++;
+    }
+    p.innerHTML = html + esc(text.slice(last));
+    return count;
+  }
+
+  function gotoHit(k) {
+    if (!txMatches.length) return;
+    txHit = (k + txMatches.length) % txMatches.length;
+    txRows.forEach(r => r.classList.remove('tx-active'));
+    const row = txRows[txMatches[txHit]];
+    row.classList.add('tx-active');
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('txHits').textContent = `${AR(txHit + 1)} من ${AR(txMatches.length)}`;
+  }
+
+  function runSearch(q) {
+    if ($('txBody').hidden && q) $('txToggle').click();
+    const prev = txMatches;
+    txMatches = []; txHit = -1;
+    const nq = norm(q);
+    let total = 0;
+    /* المرور السريع على النص المطبَّع المحفوظ، ثم تمييز المطابق فقط */
+    if (nq) cues.forEach((c, i) => { if (c._n.includes(nq)) txMatches.push(i); });
+    prev.forEach(i => { if (!txMatches.includes(i)) markRow(txRows[i], cues[i].t, ''); });
+    txRows.forEach(r => r.classList.remove('tx-active'));
+    txMatches.forEach(i => { total += markRow(txRows[i], cues[i].t, q); });
     const old = $('txBody').querySelector('.tx-empty');
     if (old) old.remove();
-    if (q && !hits) $('txBody').insertAdjacentHTML('afterbegin',
-      '<p class="tx-empty">لا توجد نتائج مطابقة.</p>');
+    const show = !!q;
+    $('txHits').hidden = $('txPrev').hidden = $('txNext').hidden = !show;
+    if (!show) return;
+    if (!txMatches.length) {
+      $('txHits').textContent = 'لا نتائج';
+      $('txBody').insertAdjacentHTML('afterbegin',
+        '<p class="tx-empty">لا توجد نتائج. جرّب كلمة أقصر — البحث يتجاهل الهمزات والتشكيل تلقائيًّا.</p>');
+      return;
+    }
+    $('txHits').title = `تكرّرت ${AR(total)} مرة في ${AR(txMatches.length)} موضعًا`;
+    gotoHit(0);
+  }
+
+  let txTimer;
+  $('txSearch').addEventListener('input', e => {
+    clearTimeout(txTimer);
+    const q = e.target.value.trim();
+    txTimer = setTimeout(() => runSearch(q), 160);
   });
+  $('txSearch').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (txMatches.length) gotoHit(txHit + (e.shiftKey ? -1 : 1));
+    else runSearch(e.target.value.trim());
+  });
+  $('txNext').addEventListener('click', () => gotoHit(txHit + 1));
+  $('txPrev').addEventListener('click', () => gotoHit(txHit - 1));
 
   function scrollToCur() {
     const row = txRows[txCur];
